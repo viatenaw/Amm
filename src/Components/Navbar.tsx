@@ -1,13 +1,15 @@
-import * as Styled from "../styles/navbar";
 import { useWeb3React } from "@web3-react/core";
+import { useDispatch } from "react-redux";
+
+import * as Styled from "../styles/navbar";
 import { injector } from "../wallet";
-import { useEffect } from "react";
 import Web3 from "web3";
 import { Lqpool } from "./Lqpool";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Swap } from "./Swap";
+import { setConnectWallet, setDisConnectWallet } from "../logic/redux/actions";
 export const Navbar: React.FC = () => {
-  const { active, account, library, activate } = useWeb3React<any>();
+  const { active, account, library, activate, deactivate } = useWeb3React<any>();
 
   const web3 = new Web3(Web3.givenProvider);
 
@@ -24,23 +26,37 @@ export const Navbar: React.FC = () => {
       console.error(err);
     }
   }
+  const handleDisConnectwallet = (props: any) => {
+    dispatch(setDisConnectWallet(props));
+  };
+  const Disconnect_ = useCallback(() => {
+    deactivate();
+    handleDisConnectwallet(false);
+    localStorage.clear();
+    document.body.style.overflow = "unset";
+  }, [deactivate]);
+  // useEffect(() => {
+  //   (async () => {
+  //     if (library != undefined) {
+  //       const networkNumber = await library.eth.net.getId();
+  //       if (networkNumber != 97) {
+  //         alert("Connect to BSC testnet please :)");
+  //       }
+  //     }
+  //   })();
 
-  useEffect(() => {
-    (async () => {
-      if (library != undefined) {
-        const networkNumber = await library.eth.net.getId();
-        if (networkNumber != 97) {
-          alert("Connect to BSC testnet please :)");
-        }
-      }
-    })();
+  //   web3.eth.getAccounts().then((res: any) => {
+  //     if (res.length != 0) {
+  //       connect();
+  //     }
+  //   });
+  // }, [library]);
 
-    web3.eth.getAccounts().then((res: any) => {
-      if (res.length != 0) {
-        connect();
-      }
-    });
-  }, [library]);
+  const dispatch = useDispatch();
+
+  const handleconnectwallet = () => {
+    dispatch(setConnectWallet(true))
+  }
 
   return (
     <>
@@ -50,9 +66,9 @@ export const Navbar: React.FC = () => {
           Liquidity Pool
         </Styled.LogoHome>
         {active ? (
-          <Styled.WalletConnected>Connected</Styled.WalletConnected>
+          <Styled.WalletConnected onClick={Disconnect_}>Connected</Styled.WalletConnected>
         ) : (
-          <Styled.WalletConnect onClick={connect}>
+          <Styled.WalletConnect onClick={handleconnectwallet}>
             Connect to metamask
           </Styled.WalletConnect>
         )}
@@ -62,11 +78,10 @@ export const Navbar: React.FC = () => {
         <Swap></Swap>
       ) : (
         <Lqpool
-          account={account ? account : ""}
-          library={library ? library : ""}
-          active={active ? active : false}
         ></Lqpool>
       )}
     </>
   );
 };
+
+

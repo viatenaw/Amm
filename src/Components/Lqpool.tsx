@@ -1,4 +1,13 @@
 import * as Styles from "../styles/pool";
+import { useWeb3React, UnsupportedChainIdError } from "@web3-react/core";
+import {
+  NoEthereumProviderError,
+  UserRejectedRequestError as UserRejectedRequestErrorInjected,
+} from "@web3-react/injected-connector";
+import { WalletConnectConnector } from '@web3-react/walletconnect-connector';
+
+import { UserRejectedRequestError as UserRejectedRequestErrorWalletConnect } from "@web3-react/walletconnect-connector";
+import { useDispatch, useSelector } from "react-redux";
 import { useState, useEffect } from "react";
 import { Pair_ } from "../logic/addLiq";
 import { Router_ } from "../logic/addLiq";
@@ -8,6 +17,9 @@ import { TokenB_add } from "../abis/TokenB";
 import { TokenA_ } from "../logic/addLiq";
 import { TokenB_ } from "../logic/addLiq";
 import Web3 from "web3";
+import CustomModal from "../shared/customModal";
+import { injector } from "../wallet";
+import { setConnectWallet } from "../logic/redux/actions";
 
 interface walletProp {
   account?: any;
@@ -15,8 +27,9 @@ interface walletProp {
   active?: boolean;
 }
 
-export const Lqpool: React.FC<walletProp> = ({ account, active, library }) => {
+export const Lqpool: React.FC<walletProp> = () => {
   const web3 = new Web3(Web3.givenProvider);
+  const { activate, deactivate, active, library, chainId, account } = useWeb3React<any>();
 
   const [price1, setPrice1] = useState<any>(0);
   const [price2, setprice2] = useState<any>(0);
@@ -45,7 +58,19 @@ export const Lqpool: React.FC<walletProp> = ({ account, active, library }) => {
   const [processing, setProcessing] = useState<boolean>(false);
   const [buttonTextRem, setRemText] = useState<string>("Approve");
   const [fundsBtn, setFundBtn] = useState<boolean>(false);
-
+  useEffect(() => {
+    (async () => {
+      if (web3.givenProvider) {
+        const currentChainId = await web3.eth.getChainId();
+        let actvMask = JSON.parse(
+          JSON.stringify(localStorage.getItem("connectorId_Metamask"))
+        );
+        if (actvMask && currentChainId == 97) {
+          ConnectMetamask();
+        }
+      }
+    })();
+  }, []);
   useEffect(() => {
     let mounted = true;
     
@@ -368,6 +393,51 @@ export const Lqpool: React.FC<walletProp> = ({ account, active, library }) => {
     }
   }
 
+
+  const dispatch = useDispatch();
+  const globalSelector = useSelector((state: any) => state);
+  const { connectwallet, disconnectWallet } = globalSelector.navbar;
+
+  const ConnectMetamask = async () => {
+    try {
+      console.log('oooooooooo>>>>>>>>>o');
+      // await activate(injector);
+      await activate(injector, (error) => {
+        if (error instanceof UnsupportedChainIdError) {
+          console.log('oooooooooo<<<<<<<<<<o');
+          deactivate();
+        } else {
+          console.log('rrrrrrrrrrrrrrrrr<<<<<<<<<<o');
+
+          if (error instanceof NoEthereumProviderError) {
+            alert("Install Metamask ");
+          } else if (
+            error instanceof UserRejectedRequestErrorInjected ||
+            error instanceof UserRejectedRequestErrorWalletConnect
+          ) {
+          } else {
+            localStorage.clear();
+          }
+        }
+      });
+      console.log(' ', web3.eth);
+
+      if (web3.eth) {
+        console.log('ooooooooooo');
+
+        const currentChainId = await web3.eth.getChainId();
+        if (currentChainId == 97) {
+          localStorage.setItem("connectorId_Metamask", JSON.stringify(true));
+        }
+      } 
+    } catch (err) {
+      console.error(err);
+    }
+  };
+  function handleconnectwallet(props: any) {
+    dispatch(setConnectWallet(props));
+  }
+  
   return (
     <>
       {btntrigger ? (
@@ -499,6 +569,39 @@ export const Lqpool: React.FC<walletProp> = ({ account, active, library }) => {
           <Styles.Button onClick={trigger}>Supply</Styles.Button>
         </Styles.LiquidityPool>
       )}
+      <CustomModal
+        show={connectwallet}
+        toggleModal={(p: boolean) => {
+          handleconnectwallet(p);
+          document.body.style.overflow = "unset";
+        }}
+        heading={"Connect a Wallet"}
+        styles={{ height: "15em" }}
+      >
+        <div className="walletconnectcontainer">
+          <div
+            className="metamask"
+            onClick={() => {
+              handleconnectwallet(false);
+              ConnectMetamask();
+              document.body.style.overflow = "unset";
+            }}
+          >
+            {/* <img src={metamask} alt="metamask" /> */}
+            <span>Metamask</span>
+          </div>
+        </div>
+      </CustomModal>
     </>
   );
 };
+
+
+const walletConnectConfig = new WalletConnectConnector({
+  rpc: {
+      80001: "https://speedy-nodes-nyc.moralis.io/a236db6e3e0a3eeff30d67b7/polygon/mumbai",
+  },
+  supportedChainIds: [97],
+  bridge: 'https://bridge.walletconnect.org',
+  qrcode: true,
+})
